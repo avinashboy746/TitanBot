@@ -17,57 +17,62 @@ export default {
 
   async execute(client) {
     try {
-      // Rotate between owner name and live server/member statistics.
-      const updateLivePresence = () => {
-        const totalServers = client.guilds.cache.size;
+      // Clear an older timer if one exists
+      if (client.botPresenceInterval) {
+        clearInterval(client.botPresenceInterval);
+      }
 
-        const totalMembers = client.guilds.cache.reduce(
-          (total, guild) =>
-            total + (Number(guild.memberCount) || 0),
-          0
-        );
+      let showOwner = true;
 
-        const activities = [
-          {
-            name: "BOT OWNER ØG CODES",
-            type: 3
-          },
-          {
-            name:
-              `${totalServers.toLocaleString("en-US")} Servers | ` +
-              `${totalMembers.toLocaleString("en-US")} Members`,
-            type: 3
-          }
-        ];
+      const rotatePresence = async () => {
+        try {
+          // Get the latest guild and member counts
+          const guilds = client.guilds.cache;
+          const totalServers = guilds.size;
 
-        let index = 0;
+          const totalMembers = guilds.reduce(
+            (sum, guild) =>
+              sum + (Number(guild.memberCount) || 0),
+            0
+          );
 
-        const showActivity = () => {
-          client.user.setPresence({
+          const activity = showOwner
+            ? {
+                name: "BOT OWNER ØG CODES",
+                type: 3
+              }
+            : {
+                name:
+                  `${totalServers.toLocaleString("en-US")} Servers | ` +
+                  `${totalMembers.toLocaleString("en-US")} Members`,
+                type: 3
+              };
+
+          await client.user.setPresence({
             status: config.bot.presence?.status || "online",
-            activities: [activities[index]]
-          }).catch((error) => {
-            logger.error("Presence update failed:", error);
+            activities: [activity]
           });
 
-          index = (index + 1) % activities.length;
-        };
+          startupLog(
+            `Presence updated: ${activity.name}`
+          );
 
-        showActivity();
-
-        if (client.botPresenceInterval) {
-          clearInterval(client.botPresenceInterval);
+          showOwner = !showOwner;
+        } catch (error) {
+          logger.error("Presence rotation failed:", error);
         }
-
-        client.botPresenceInterval = setInterval(
-          showActivity,
-          15_000
-        );
-
-        client.botPresenceInterval.unref?.();
       };
 
-      updateLivePresence();
+      // Show the first status immediately
+      await rotatePresence();
+
+      // Rotate the two statuses every 15 seconds
+      client.botPresenceInterval = setInterval(
+        rotatePresence,
+        15_000
+      );
+
+      client.botPresenceInterval.unref?.();
 
       startupLog(`Ready! Logged in as ${client.user.tag}`);
       startupLog(`Serving ${client.guilds.cache.size} guild(s)`);
