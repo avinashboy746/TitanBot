@@ -38,7 +38,7 @@ export default {
 
           const activity = showOwner
             ? {
-                name: "BOT OWNER ØG CODES",
+                name: "🚧 || BOT OWNER ØG CODES",
                 type: 3
               }
             : {
