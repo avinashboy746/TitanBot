@@ -17,46 +17,57 @@ export default {
 
   async execute(client) {
     try {
-      // Automatically calculate live server and member counts
-      const updateLivePresence = async () => {
-        const guilds = client.guilds.cache;
+      // Rotate between owner name and live server/member statistics.
+      const updateLivePresence = () => {
+        const totalServers = client.guilds.cache.size;
 
-        const totalServers = guilds.size;
-
-        const totalMembers = guilds.reduce(
+        const totalMembers = client.guilds.cache.reduce(
           (total, guild) =>
             total + (Number(guild.memberCount) || 0),
           0
         );
 
-        await client.user.setPresence({
-          status: config.bot.presence?.status || "online",
-          activities: [
-            {
-              name:
-                `${totalMembers.toLocaleString("en-US")} Members | ` +
-                `${totalServers.toLocaleString("en-US")} Servers`,
-              type: 3
-            }
-          ]
-        });
+        const activities = [
+          {
+            name: "BOT OWNER ØG CODES",
+            type: 3
+          },
+          {
+            name:
+              `${totalServers.toLocaleString("en-US")} Servers | ` +
+              `${totalMembers.toLocaleString("en-US")} Members`,
+            type: 3
+          }
+        ];
+
+        let index = 0;
+
+        const showActivity = () => {
+          client.user.setPresence({
+            status: config.bot.presence?.status || "online",
+            activities: [activities[index]]
+          }).catch((error) => {
+            logger.error("Presence update failed:", error);
+          });
+
+          index = (index + 1) % activities.length;
+        };
+
+        showActivity();
+
+        if (client.botPresenceInterval) {
+          clearInterval(client.botPresenceInterval);
+        }
+
+        client.botPresenceInterval = setInterval(
+          showActivity,
+          15_000
+        );
+
+        client.botPresenceInterval.unref?.();
       };
 
-      // Show the counts immediately
-      await updateLivePresence();
-
-      // Refresh counts every 30 seconds
-      if (client.botPresenceInterval) {
-        clearInterval(client.botPresenceInterval);
-      }
-
-      client.botPresenceInterval = setInterval(() => {
-        updateLivePresence().catch((error) => {
-          logger.error("Live presence update failed:", error);
-        });
-      }, 30_000);
-
-      client.botPresenceInterval.unref?.();
+      updateLivePresence();
 
       startupLog(`Ready! Logged in as ${client.user.tag}`);
       startupLog(`Serving ${client.guilds.cache.size} guild(s)`);
@@ -73,7 +84,8 @@ export default {
         `Reaction role reconciliation: scanned ${reconciliationSummary.scannedMessages}, removed ${reconciliationSummary.removedMessages}, errors ${reconciliationSummary.errors}`
       );
 
-      const ticketPanelSummary = await reconcileTicketPanels(client);
+      const ticketPanelSummary =
+        await reconcileTicketPanels(client);
 
       startupLog(
         `Ticket panel health: scanned ${ticketPanelSummary.scannedGuilds} guilds, healthy ${ticketPanelSummary.healthyPanels}, deleted ${ticketPanelSummary.deletedPanels}, missing channel ${ticketPanelSummary.missingChannels}, recovered ${ticketPanelSummary.recoveredIds}, errors ${ticketPanelSummary.errors}`
@@ -93,7 +105,8 @@ export default {
         `Reaction role panel health: scanned ${reactionRolePanelSummary.scannedPanels} panels, healthy ${reactionRolePanelSummary.healthyPanels}, deleted ${reactionRolePanelSummary.deletedPanels}, missing channel ${reactionRolePanelSummary.missingChannels}, recovered ${reactionRolePanelSummary.recoveredIds}, errors ${reactionRolePanelSummary.errors}`
       );
 
-      const levelRoleSummary = await reconcileLevelRoles(client);
+      const levelRoleSummary =
+        await reconcileLevelRoles(client);
 
       startupLog(
         `Level role sync: scanned ${levelRoleSummary.scannedGuilds} guilds, pruned ${levelRoleSummary.prunedRewardEntries} stale rewards, re-awarded ${levelRoleSummary.rolesReAwarded} roles, errors ${levelRoleSummary.errors}`
